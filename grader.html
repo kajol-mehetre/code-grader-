@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Code Grader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 60px auto;
+      background: #1e1e1e;
+      color: #f0f0f0;
+    }
+
+    h1 {
+      text-align: center;
+      color: #4CAF50;
+    }
+
+    p.subtitle {
+      text-align: center;
+      color: #aaa;
+      margin-bottom: 30px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 200px;
+      background: #2d2d2d;
+      color: #f0f0f0;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 14px;
+      font-family: monospace;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 12px;
+      width: 100%;
+      padding: 12px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #45a049;
+    }
+
+    #result {
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 15px;
+      display: none;
+      /* hidden until Run is clicked */
+    }
+
+    .pass {
+      background: #1b4332;
+      border: 1px solid #4CAF50;
+      color: #4CAF50;
+    }
+
+    .fail {
+      background: #4a1010;
+      border: 1px solid #e74c3c;
+      color: #e74c3c;
+    }
+
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 16px;
+      background: #2d2d2d;
+      color: #f0f0f0;
+      border: 1px solid #444;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    th,
+    td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid #333;
+      font-size: 14px;
+    }
+
+    th {
+      color: #4CAF50;
+      font-weight: bold;
+    }
+
+    td {
+      color: #ccc;
+    }
+
+    tr:hover {
+      background: #2a2a2a;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>⚡ Code Grader</h1>
+
+  <p class="subtitle">Select a problem and write your solution</p>
+
+  <select id="problemSelect">
+    <option value="add">1. add(a, b) — return sum of two numbers</option>
+    <option value="multiply">2. multiply(a, b) — return product of two numbers</option>
+    <option value="reverse">3. reverse(str) — return a string reversed</option>
+  </select>
+  <p id="problemDescription" style="color:#aaa; font-size:14px; margin-bottom:10px;"></p>
+  <textarea id="codeInput" placeholder="// Write your JavaScript function here..."></textarea>
+
+  <button id="runBtn">▶ Run & Grade</button>
+
+  <div id="result"></div>
+
+  <div id="historySection" style="display:none; margin-top:30px;">
+    <h3 style="color:#aaa;">📋 Submission History</h3>
+    <table id="historyTable">
+      <thead>
+        <tr>
+          <th>Problem</th>
+          <th>Score</th>
+          <th>Verdict</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody">
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const problemSelect = document.getElementById('problemSelect');
+    const codeInput = document.getElementById('codeInput');
+    const runBtn = document.getElementById('runBtn');
+    const result = document.getElementById('result');
+    
+
+    // Each problem has: a description, test cases, and which function to look for
+    const problems = {
+      add: {
+        functionName: 'add',
+        description: 'Write a function add(a, b) that returns the sum of two numbers',
+        testCases: [
+          { args: [2, 3], expected: 5 },
+          { args: [0, 0], expected: 0 },
+          { args: [-1, 1], expected: 0 },
+          { args: [10, 90], expected: 100 },
+        ]
+      },
+
+      multiply: {
+        functionName: 'multiply',
+        description: 'Write a function multiply(a, b) that returns the product of two numbers',
+        testCases: [
+          { args: [2, 3], expected: 6 },
+          { args: [0, 5], expected: 0 },
+          { args: [-2, 3], expected: -6 },
+          { args: [4, 4], expected: 16 },
+        ]
+      },
+
+      reverse: {
+        functionName: 'reverse',
+        description: 'Write a function reverse(str) that returns the string reversed',
+        testCases: [
+          { args: ['hello'], expected: 'olleh' },
+          { args: ['world'], expected: 'dlrow' },
+          { args: [''], expected: '' },
+          { args: ['abcd'], expected: 'dcba' },
+        ]
+      }
+    };
+
+    // ✅ When dropdown changes, update the description and clear everything
+    problemSelect.addEventListener('change', function () {
+      updateDescription();
+      codeInput.value = '';
+      result.style.display = 'none';
+    });
+
+    // Show description of selected problem
+    function updateDescription() {
+      const selected = problems[problemSelect.value];
+      document.getElementById('problemDescription').textContent = selected.description;
+    }
+
+    // Run on page load so description shows immediately
+    updateDescription();
+
+    runBtn.addEventListener('click', function () {
+      const userCode = codeInput.value;
+
+      // Get the currently selected problem
+      const selected = problems[problemSelect.value];
+
+      // Try to run user's code
+      let userFunction;
+      try {
+        userFunction = new Function(userCode + `\n return ${selected.functionName};`)();
+      } catch (err) {
+        showResult(false, `❌ Syntax Error: ${err.message}`, []);
+        return;
+      }
+
+      // Run each test case
+      const results = selected.testCases.map(function (test) {
+        try {
+          const actual = userFunction(...test.args);
+          const passed = actual === test.expected;
+          return { passed, input: test.args, expected: test.expected, actual };
+        } catch (err) {
+          return { passed: false, input: test.args, expected: test.expected, actual: `Error: ${err.message}` };
+        }
+      });
+
+      const allPassed = results.every(r => r.passed);
+      showResult(allPassed, '', results);
+    });
+
+    function showResult(allPassed, errorMsg, results) {
+      result.style.display = 'block';
+
+      if (errorMsg) {
+        result.className = 'fail';
+        result.innerHTML = errorMsg;
+        return;
+      }
+
+      const passed = results.filter(r => r.passed).length;
+      const total = results.length;
+
+      //Calculate score as percentage
+      const score = Math.round((passed / total) * 100);
+
+      let html = results.map(function (r) {
+        const icon = r.passed ? '✅' : '❌';
+        return `<div style="margin-bottom:6px">${icon} ${r.input} → expected <b>${r.expected}</b>, got <b>${r.actual}</b></div>`;
+      }).join('');
+
+      const verdict = allPassed ? '🎉 All Tests Passed!' : `❌ ${passed}/${total} Tests Passed`;
+
+      result.className = allPassed ? 'pass' : 'fail';
+
+      // Score line added to result display
+      result.innerHTML = `
+      <strong>${verdict}</strong>
+      <span style="float:right; font-size:22px;">${score}%</span>
+      <br><br>${html}
+    `;
+
+      // Log this attempt to history
+      addToHistory(problemSelect.value, score, allPassed);
+    }
+
+    function addToHistory(problemName, score, allPassed) {
+      // Show the history section if first submission
+      document.getElementById('historySection').style.display = 'block';
+
+      const historyBody = document.getElementById('historyBody');
+
+      // Get current time
+      const now = new Date();
+      const time = now.toLocaleTimeString();
+
+      // Create a new row
+      const row = document.createElement('tr');
+      row.innerHTML = `
+      <td>${problemName}</td>
+      <td>${score}%</td>
+      <td style="color:${allPassed ? '#4CAF50' : '#e74c3c'}">
+        ${allPassed ? '✅ Passed' : '❌ Failed'}
+      </td>
+      <td>${time}</td>
+    `;
+
+      // ✅ Add newest submission at the TOP
+      historyBody.prepend(row);
+    }
+  
+  </script>
+
+</body>
+
+</html>
